@@ -19,6 +19,7 @@ import json
 import os
 import struct
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -486,10 +487,18 @@ def main():
                              % (len(answers), status, body.decode("utf-8", "replace")[:200]))
             return 0 if 200 <= status < 300 else 1
         except urllib.error.HTTPError as exc:
+            # 409 means the photos are already answered: the first POST
+            # landed and only its response was lost, so the answers are in.
+            if exc.code == 409:
+                sys.stdout.write("main.py: answered %d photos: already accepted (HTTP 409)\n"
+                                 % len(answers))
+                return 0
             sys.stderr.write("main.py: answers refused: HTTP %d\n" % exc.code)
             return 1
-        except Exception as exc:  # noqa: BLE001 - retry a failed post once
+        except Exception as exc:  # noqa: BLE001 - retry a failed post
             last_exc = exc
+            if _attempt < 2:
+                time.sleep(1)
     sys.stderr.write("main.py: answers post failed: %r\n" % (last_exc,))
     return 1
 
